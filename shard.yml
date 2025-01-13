@@ -1,0 +1,9 @@
+name: crowbar
+version: 0.0.1
+
+authors:
+  - Gabriel Silveira <gabriel.silveira@poli.ufrj.br>
+
+crystal: ">= 1.14.0"
+
+license: MIT OR 0BSD
