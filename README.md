@@ -1,4 +1,4 @@
-# Crowbar
+![Logo](logo.svg)
 
 TODO: Write a description here
 
