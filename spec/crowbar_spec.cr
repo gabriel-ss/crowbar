@@ -216,8 +216,8 @@ describe Crowbar do
         }
 
         raw_body = context.request.body.as(HTTP::ChunkedContent).io
-        raw_body.gets(chomp: false).should eq "ae\r\n"
-        raw_body.gets(chomp: false).should eq %({"statusCode":"ok","headers":{"Content-Type":"application/json","Target":"Mars"},"cookies":["flavor=chocolate","topper=cream; expires=Wed, 01 Jan 2025 10:10:10 GMT"]}\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\r\n)
+        raw_body.gets(chomp: false).should eq "ad\r\n"
+        raw_body.gets(chomp: false).should eq %({"statusCode":200,"headers":{"Content-Type":"application/json","Target":"Mars"},"cookies":["flavor=chocolate","topper=cream; expires=Wed, 01 Jan 2025 10:10:10 GMT"]}\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\r\n)
         raw_body.gets(chomp: false).should eq "7\r\n"
         raw_body.gets(chomp: false).should eq %({"key":\r\n)
         raw_body.gets(chomp: false).should eq "9\r\n"

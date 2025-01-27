@@ -228,7 +228,7 @@ module Crowbar
       super
 
       prelude = String.build(capacity: 128) do |str|
-        status_code = self.status_code
+        status_code = self.status_code.code
         headers = self.headers
         cookies = self.cookies
 
