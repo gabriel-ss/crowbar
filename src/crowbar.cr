@@ -2,6 +2,7 @@ require "http/client"
 require "json"
 require "base64"
 require "./context"
+require "./http/cookie"
 
 private macro handle_event(event_type, invocation, context, output_io = nil)
 {% if event_type.resolve <= Bytes %}
@@ -236,7 +237,7 @@ module Crowbar
             json.field "statusCode", status_code
             json.field "headers" { headers.to_json json } if headers
             json.field "cookies" do
-              json.array { cookies.each { |cookie| json.string cookie.to_set_cookie_header } }
+              json.array { cookies.each { |cookie| json.string { |io| cookie.to_set_cookie_header io } } }
             end if cookies
           end
         end
