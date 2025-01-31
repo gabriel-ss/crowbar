@@ -3,6 +3,7 @@ require "json"
 require "base64"
 require "./context"
 require "./http/cookie"
+require "./http/server_response"
 
 private macro handle_event(event_type, invocation, context, output_io = nil)
 {% if event_type.resolve <= Bytes %}
@@ -222,26 +223,44 @@ module Crowbar
 
     private PRELUDE_DELIMITER = Bytes.new(size: 8, value: 0)
 
+    protected property bound_response : HttpServerResponse?
+
     @content_type = "application/vnd.awslambda.http-integration-response"
 
     private def write_prelude
       super
 
-      prelude = String.build(capacity: 128) do |str|
-        status_code = self.status_code.code
-        headers = self.headers
-        cookies = self.cookies
+      prelude = String.build(capacity: 128) do |prelude_string|
+        status_code = bound_response.try(&.status_code) || self.status_code.code
+        headers = bound_response.try(&.headers) || self.headers
+        cookies = bound_response.try(&.cookies) || self.cookies
+        bound_response.try(&.wrote_headers = true)
 
-        JSON.build(str) do |json|
+        JSON.build(prelude_string) do |json|
           json.object do
             json.field "statusCode", status_code
-            json.field "headers" { headers.to_json json } if headers
+
+            json.field "headers" do
+              json.object do
+                headers.each do |key, value|
+                  json.string key
+                  json.string do |io|
+                    if value.is_a? Array(String)
+                      value.join(io, ", ")
+                    else
+                      io << value
+                    end
+                  end
+                end
+              end
+            end if headers
+
             json.field "cookies" do
               json.array { cookies.each { |cookie| json.string { |io| cookie.to_set_cookie_header io } } }
             end if cookies
           end
         end
-        str.write PRELUDE_DELIMITER
+        prelude_string.write PRELUDE_DELIMITER
       end.to_slice
 
       unbuffered_write prelude

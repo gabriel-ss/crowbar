@@ -9,6 +9,7 @@ ENV["AWS_LAMBDA_LOG_GROUP_NAME"] = "log_group_name"
 ENV["AWS_LAMBDA_LOG_STREAM_NAME"] = "log_stream_name"
 
 require "../src/crowbar"
+require "../src/http"
 
 # Crystal's HTTP server is too lenient with malformed requests, so chunked content
 # tests are performed on the underlying TCP socket.
@@ -21,7 +22,7 @@ end
 module Crowbar
   class_getter captured_logs = IO::Memory.new
 
-  def self.capture_log_output
+  def self.capture_log_output(&)
     log_output = @@log_output
     self.captured_logs.clear
     @@log_output = self.captured_logs
@@ -94,12 +95,11 @@ class LambdaTestServer
 
   delegate listen, close, to: @server
 
-  def self.test_invocation(event_body : String, test_handler : Proc(T, Crowbar::Context, U) | Proc(T, Crowbar::Context, U, Nil), &response_expectation : HTTP::Server::Context ->) forall T, U
+  private def self.test_invocation(test_server : self, &)
     ENV["AWS_LAMBDA_RUNTIME_API"] = "127.0.0.1:#{PORT}"
-    test_server = self.new(event_body) { |context| response_expectation.call context }
     spawn { test_server.listen }
 
-    Crowbar.handle_events with: test_handler
+    yield
   rescue ex
     test_server.not_nil!.close
     raise ex unless ex.message.try &.matches? /Unexpected response when responding request '[0-9a-f\-]*': Test Concluded/
@@ -107,7 +107,20 @@ class LambdaTestServer
     test_server.not_nil!.expectation_error.try { |error| raise error }
   end
 
-  def self.test_invocation(event_body : String, event_type : T.class, &test_handler : T, Crowbar::Context -> U) forall T, U
+  def self.test_invocation(
+    event_body : String,
+    test_handler : Proc(T, Crowbar::Context, U) | Proc(T, Crowbar::Context, U, Nil),
+    &response_expectation : HTTP::Server::Context ->
+  ) forall T, U
+    test_server = self.new(event_body) { |context| response_expectation.call context }
+    self.test_invocation(test_server) { Crowbar.handle_events with: test_handler }
+  end
+
+  def self.test_invocation(
+    event_body : String,
+    event_type : T.class,
+    &test_handler : T, Crowbar::Context -> U
+  ) forall T, U
     self.test_invocation(event_body, test_handler) do |context|
       if context.request.path.ends_with? "/error"
         raise HandlerError.from_json(context.request.body.not_nil!).message
@@ -115,11 +128,49 @@ class LambdaTestServer
     end
   end
 
-  def self.test_invocation(event_body : String, event_type : T.class, response_io_type : U.class, &test_handler : T, Crowbar::Context, U ->) forall T, U
+  def self.test_invocation(
+    event_body : String,
+    event_type : T.class,
+    response_io_type : U.class,
+    &test_handler : T, Crowbar::Context, U ->
+  ) forall T, U
     self.test_invocation(event_body, test_handler) do |context|
       if context.request.path.ends_with? "/error"
         raise HandlerError.from_json(context.request.body.not_nil!).message
       end
+    end
+  end
+
+  def self.test_adapter(
+    event_body : String,
+    handler : HTTP::Handler | HTTP::Handler::HandlerProc,
+    adapter : Crowbar::BufferedAdapter | Crowbar::StreamingAdapter,
+    &response_expectation : HTTP::Server::Context ->
+  ) forall T, U
+    test_server = self.new(event_body) do |context|
+      current = handler
+      while (current)
+        current.last_error.try { |e| raise e } if current.responds_to? :last_error
+        current = current.responds_to? :next ? current.next : nil
+      end
+      response_expectation.call context
+    end
+
+    self.test_invocation(test_server) { Crowbar.handle_events with: handler, using: adapter }
+  end
+
+  class ErrorHandler
+    include HTTP::Handler
+
+    property last_error : Exception?
+
+    def initialize(&@handler : HTTP::Server::Context -> Nil); end
+
+    def call(context) : Nil
+      @last_error = nil
+      @handler.call(context)
+    rescue ex : Exception
+      @last_error = ex
     end
   end
 end
