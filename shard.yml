@@ -4,6 +4,16 @@ version: 0.0.2
 authors:
   - Gabriel Silveira <gabriel.silveira@poli.ufrj.br>
 
+targets:
+  crowbar:
+    main: src/cli/entrypoint.cr
+
+scripts:
+  postinstall: shards build
+
+executables:
+  - crowbar
+
 crystal: ">= 1.14.0"
 
 license: MIT OR 0BSD

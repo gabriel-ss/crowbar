@@ -1,0 +1,17 @@
+#!/bin/bash
+
+build_script="$(cat <<'EOF'
+<%= containerized_build_script %>
+EOF
+)"
+
+container_name="crowbar_build_$(cat /dev/urandom | tr -dc 'a-f0-9' | head -c 8)"
+
+docker build --tag crowbar_build .
+docker run --name $container_name -dit --rm crowbar_build /bin/bash
+
+docker cp ./. $container_name:/var/task" && \
+docker exec $container_name /bin/bash -c "$build_script" && \
+docker cp $container_name:/bundle.zip <%= options.output %>"
+
+docker stop $container_name

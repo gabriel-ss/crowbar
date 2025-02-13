@@ -1,0 +1,58 @@
+set -e
+
+TARGET_ARCH="<%= target_arch %>"
+
+CHROOT="$(
+  case "$TARGET_ARCH" in
+    x86_64) echo "$X86_64_ROOT" ;;
+    aarch64) echo "$AARCH64_ROOT" ;;
+    *) echo 'Invalid architecture'; exit 1 ;;
+  esac
+)"
+
+LIBRARIES_DIR="$CHROOT/lib64"
+
+<%- unless extra_packages.empty? -%>
+dnf -y install --forcearch="$TARGET_ARCH" --installroot="$CHROOT" <%= extra_packages.map { |pkg| Process.quote(pkg) }.join(' ') %>
+<%- end -%>
+<%- unless dynamic_libraries.empty? -%>
+cp <%= dynamic_libraries.map { |pkg| Process.quote(pkg) }.join(' ') %> "$LIBRARIES_DIR"
+<%- end -%>
+
+rm -rf bin
+mkdir /bundle
+
+shards build "<%= target %>" <%= shards_args.map { |arg| Process.quote arg }.join(" ") %> --cross-compile --target="${TARGET_ARCH}-linux-gnu" | tee /tmp/build-output
+if [ ! -e "bin/<%= target %>.o" ]; then exit 1; fi
+
+# Link the object file into an executable
+eval "/build/zig/zig $(tail /tmp/build-output -n1 | sed 's%-L/usr/lib64/crystal%%') -L\"$LIBRARIES_DIR\" -lunwind" -target "${TARGET_ARCH}-linux-gnu"
+
+function list_required_libs() {
+  target="$1"
+  checked_libs="$2"
+  target_dependencies="$(objdump -x $target | sed -nE 's/\s*NEEDED\s*(.*)/\1/p')"
+  libs_to_check="$(echo "$target_dependencies" | sed -e "/ld-linux-/d; $(for lib in $checked_libs; do echo "\:$lib:d;"; done)" | sort -u)"
+
+  for lib in $libs_to_check; do
+    checked_libs="$(list_required_libs "$LIBRARIES_DIR/$lib" "$checked_libs $lib")"
+  done
+
+  if [ -z "$2" ]
+  then echo "$checked_libs"
+  else echo "$checked_libs" | tr ' ' '\n'  | sed '/ld-linux/d' | sort -u
+  fi
+}
+
+list_required_libs "bin/<%= target %>" > required_libs
+
+<%- unless files_to_bundle.empty? -%>
+cp -r <%= files_to_bundle.map { |pkg| Process.quote(pkg) }.join(' ') %> /bundle
+<%- end -%>
+
+libs_to_ship=$(comm -13 /build/default_libs required_libs)
+test -n "$extra_dirs" && cp -r $extra_dirs /bundle
+mv "bin/<%= target %>" /bundle/bootstrap
+cd "$LIBRARIES_DIR"
+test -n "$libs_to_ship" && cp -L $libs_to_ship /bundle
+cd /bundle && zip -9 -r ../bundle.zip ./*
