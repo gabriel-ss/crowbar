@@ -215,8 +215,6 @@ module Crowbar
   end
 
   class HttpResponseIO < BaseResponseIO
-    include IO::Buffered
-
     property status_code : HTTP::Status = HTTP::Status::OK
     property headers : HTTP::Headers?
     property cookies : HTTP::Cookies?
