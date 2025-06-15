@@ -20,5 +20,5 @@ RUN mkdir -p /build && cd /build && \
     dnf -y install --forcearch=aarch64 --installroot=$AARCH64_ROOT --setopt=tsflags=noscripts $crystal_deps && \
     # Install zig to link the cross compiled object into an executable
     latest_zig_release="$(curl -SsL https://api.github.com/repos/ziglang/zig/releases/latest | sed -nE 's/.*"tag_name"\s*:\s*"([^"]*)".*/\1/p')" && \
-    curl -L https://ziglang.org/download/$latest_zig_release/zig-linux-x86_64-$latest_zig_release.tar.xz | tar xJf - && \
+    curl -L https://ziglang.org/download/$latest_zig_release/zig-x86_64-linux-$latest_zig_release.tar.xz | tar xJf - && \
     mv zig* zig
