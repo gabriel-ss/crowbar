@@ -14,24 +14,26 @@ INHERIT_STDIO = {
   error:  Process::Redirect::Inherit,
 }
 
-def docker(*args : String, **kwargs)
-  status = Process.run("docker", args, **INHERIT_STDIO.merge(kwargs))
-  raise "docker exited with status #{status.exit_code}" unless status.success?
+CONTAINER_COMMAND = Process.find_executable("podman") ? "podman" : "docker"
+
+def container(*args : String, **kwargs)
+  status = Process.run(CONTAINER_COMMAND, args, **INHERIT_STDIO.merge(kwargs))
+  raise "#{CONTAINER_COMMAND} exited with status #{status.exit_code}" unless status.success?
 end
 
 case options.command
 in .build?
   container_name = "crowbar_build_#{Random::Secure.hex(4)}"
 
-  docker "build", "--tag", "crowbar_build", "-", input: IO::Memory.new(dockerfile)
-  docker "run", "--name", container_name, "-dit", "--rm", "crowbar_build", "/bin/bash"
+  container "build", "--tag", "crowbar_build", "-", input: IO::Memory.new(dockerfile)
+  container "run", "--name", container_name, "-dit", "--rm", "crowbar_build", "/bin/bash"
 
   begin
-    docker "cp", "./.", "#{container_name}:/var/task"
-    docker "exec", container_name, "/bin/bash", "-c", containerized_build_script
-    docker "cp", "#{container_name}:/bundle.zip", options.output
+    container "cp", "./.", "#{container_name}:/var/task"
+    container "exec", container_name, "/bin/bash", "-c", containerized_build_script
+    container "cp", "#{container_name}:/bundle.zip", options.output
   ensure
-    docker "stop", container_name
+    container "stop", container_name
   end
 in .plan?
   File.write("Dockerfile", dockerfile)

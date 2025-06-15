@@ -6,12 +6,14 @@ EOF
 )"
 
 container_name="crowbar_build_$(cat /dev/urandom | tr -dc 'a-f0-9' | head -c 8)"
+container="$(podman -v &> /dev/null && echo "podman" || echo "docker")"
 
-docker build --tag crowbar_build .
-docker run --name $container_name -dit --rm crowbar_build /bin/bash
 
-docker cp ./. $container_name:/var/task" && \
-docker exec $container_name /bin/bash -c "$build_script" && \
-docker cp $container_name:/bundle.zip <%= options.output %>"
+$container build --tag crowbar_build .
+$container run --name $container_name -dit --rm crowbar_build /bin/bash
 
-docker stop $container_name
+$container cp ./. $container_name:/var/task" && \
+$container exec $container_name /bin/bash -c "$build_script" && \
+$container cp $container_name:/bundle.zip <%= options.output %>"
+
+$container stop $container_name

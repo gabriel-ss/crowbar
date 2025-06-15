@@ -37,7 +37,7 @@ end
 # Crowbar.handle_events with: handler
 ```
 
-The included CLI can be used to build a project targeting the AWS `provided.al2023` runtime by using Docker. The `docker` command must be available to the current user.
+The included CLI can be used to build a project targeting the AWS `provided.al2023` runtime by using Docker/Podman. Either the `docker` or the `podman` command must be available to the current user.
 
 ```bash
 # Build the project in a lambda compatible environment

@@ -68,7 +68,7 @@ class Options
       Usage: #{PROGRAM_NAME} [arguments] [--] [...shards build arguments]
 
       A tool for building AWS Lambda functions written in Crystal targeting
-      Amazon Linux 2023 provided runtime using docker.
+      Amazon Linux 2023 provided runtime using docker/podman.
 
       Examples:
       #{PROGRAM_NAME} -a aarch64 -f assets -e libgit2-devel -- --production --release
