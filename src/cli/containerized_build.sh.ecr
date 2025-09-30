@@ -26,7 +26,7 @@ shards build "<%= target %>" <%= shards_args.map { |arg| Process.quote arg }.joi
 if [ ! -e "bin/<%= target %>.o" ]; then exit 1; fi
 
 # Link the object file into an executable
-eval "/build/zig/zig $(tail /tmp/build-output -n1 | sed 's%-L/usr/lib64/crystal%%') -L\"$LIBRARIES_DIR\" -lunwind" -target "${TARGET_ARCH}-linux-gnu"
+eval "/build/zig/zig $(tail /tmp/build-output -n1 | sed 's%-L/usr/lib64/crystal%%') -L\"$LIBRARIES_DIR\" -lunwind" -undefined dynamic_lookup -target "${TARGET_ARCH}-linux-gnu"
 
 function list_required_libs() {
   target="$1"

@@ -71,7 +71,7 @@ class Options
       Amazon Linux 2023 provided runtime using docker/podman.
 
       Examples:
-      #{PROGRAM_NAME} -a aarch64 -f assets -e libgit2-devel -- --production --release
+      #{PROGRAM_NAME} build -a aarch64 -f assets -e libgit2-devel -- --production --release
 
       Arguments:
       BANNER
