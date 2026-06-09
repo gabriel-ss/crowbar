@@ -1,6 +1,6 @@
 ![Logo](logo.svg)
 
-Crowbar is an AWS Lambda runtime focused on efficiency, type safety and developer friendliness. In addition to the runtime itself, this shard also includes adapters to deploy Crystal web apps as lambdas and a CLI to easily build projects to be deployed.
+Crowbar is an AWS Lambda runtime focused on efficiency, type safety and developer friendliness. In addition to the runtime itself, this shard also includes adapters to deploy Crystal web apps as lambdas and a CLI to easily build projects to be deployed. For lambdas triggered by AWS services (S3, SQS, EventBridge, etc.), the companion shard [`aws-lambda-events-cr`](https://github.com/gabriel-ss/aws-lambda-events-cr) is highly suggested.
 
 ## Installation
 
@@ -153,6 +153,32 @@ end
 
 # cat response # => {"ans":42}
 ```
+
+### Typed AWS event payloads
+
+The examples above use ad-hoc types, which is the right choice for lambdas you invoke directly. For lambdas triggered by AWS services (S3, SQS, DynamoDB Streams, API Gateway, EventBridge, etc.), the companion shard [`aws-lambda-events-cr`](https://github.com/gabriel-ss/aws-lambda-events-cr) ships ready-made `JSON::Serializable` structs covering every AWS-published trigger payload:
+
+```yaml
+dependencies:
+  crowbar:
+    github: gabriel-ss/crowbar
+  aws-lambda-events-cr:
+    github: gabriel-ss/aws-lambda-events-cr
+```
+
+```crystal
+require "crowbar"
+require "aws-lambda-events-cr/sqs"
+
+Crowbar.handle_events of_type: AWSLambdaEvents::SQS::Event do |event, context|
+  failed = event.records.reject { |msg| process(msg) }
+  AWSLambdaEvents::SQS::Response.new(
+    failed.map { |msg| AWSLambdaEvents::SQS::BatchItemFailure.new(msg.message_id) }
+  )
+end
+```
+
+Each service module exposes `Event` / `Response` aliases for its canonical inbound and outbound types — see the shard's README for the full catalogue and conventions.
 
 ### Streaming Response
 
