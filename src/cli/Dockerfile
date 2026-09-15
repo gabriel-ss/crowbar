@@ -14,7 +14,7 @@ RUN mkdir -p /build && cd /build && \
     rpm -i dnf-*.rpm --force --nodeps && \
     rm dnf-*.rpm && \
     # Install crystal for current root
-    curl -fsSL https://crystal-lang.org/install.sh | bash && \
+    curl -fsSL https://crystal-lang.org/install.sh | DISTRO_REPO=Fedora_Rawhide bash && \
     # Initialize root for aarch64
     releasever="$(rpm -q --qf '%{VERSION}' system-release)" && \
     dnf -y install --releasever="$releasever" --forcearch=aarch64 --installroot=$AARCH64_ROOT basesystem && \
