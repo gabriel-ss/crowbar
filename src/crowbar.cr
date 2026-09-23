@@ -1,3 +1,4 @@
+require "./exec_wrapper"
 require "http/client"
 require "json"
 require "base64"

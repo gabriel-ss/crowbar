@@ -256,6 +256,14 @@ The build command tries to be flexible enough to cover the vast majority of use 
 
 The generated zip file includes, in addition to other specified assets, both the built project and necessary dependencies, so it can be directly deployed to AWS. Unlike AWS provided runtimes such as python or node, Crowbar is directly linked against the user's event handler, so the `handler` parameter configured on the lambda isn't used by the runtime. Its value can be retrieved from the `_HANDLER` environment variable, though.
 
+### Wrapper scripts
+
+Lambda's managed runtimes can be started through a [wrapper script](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-modify.html) named in the `AWS_LAMBDA_EXEC_WRAPPER` environment variable, which is how layers that need to run before the function (secret injection, instrumentation, ...) usually hook in. OS-only runtimes such as `provided.al2023` don't support wrapper scripts: the function's binary is the runtime, and Lambda runs it directly.
+
+Crowbar fills that gap by honoring the variable itself. When `AWS_LAMBDA_EXEC_WRAPPER` is set, the process re-executes once through the wrapper, passing its own command line as the arguments, exactly as a managed runtime would be started. The wrapper does its work and hands control back with `exec "$@"`; that second start sees `CROWBAR_EXEC_WRAPPER_APPLIED=1` in its environment and proceeds normally. Nothing changes in the bundle, and the variable is simply ignored when it is unset or empty.
+
+Since the re-execution happens when `crowbar` is required, keep `require "crowbar"` before any code with side effects, otherwise that code runs twice. If the wrapper can't be started the function fails at initialization, as it would on a managed runtime.
+
 ## Contributing
 
 1. Fork it (<https://github.com/gabriel-ss/crowbar/fork>)
