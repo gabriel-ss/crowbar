@@ -51,8 +51,10 @@ class Options
 
     parser.on("-e PKG", "--extra-package=PKG", <<-DOC) { |value| @extra_packages << value }
       Extra packages from amazon linux 2023 repository to install in
-      the build container. Useful for installing native dependencies.
-      Available packages can be found at:
+      the build container, in the root of the target architecture.
+      Useful for installing native dependencies: a shard that links a
+      system library needs its -devel package here (e.g. libzstd-devel
+      for zstd.cr). Available packages can be found at:
       https://docs.aws.amazon.com/linux/al2023/release-notes/all-packages.html
 
       Can be used multiple times.

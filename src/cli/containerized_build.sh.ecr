@@ -22,11 +22,17 @@ cp <%= dynamic_libraries.map { |pkg| Process.quote(pkg) }.join(' ') %> "$LIBRARI
 rm -rf bin
 mkdir /bundle
 
+# When cross-compiling, pkg-config answers for the target root so @[Link] ldflags resolve against it
+if [ "$CHROOT" != "/" ]; then
+  export PKG_CONFIG_SYSROOT_DIR="$CHROOT"
+  export PKG_CONFIG_LIBDIR="$CHROOT/usr/lib64/pkgconfig:$CHROOT/usr/share/pkgconfig"
+fi
+
 shards build "<%= target %>" <%= shards_args.map { |arg| Process.quote arg }.join(" ") %> --cross-compile --target="${TARGET_ARCH}-linux-gnu" | tee /tmp/build-output
 if [ ! -e "bin/<%= target %>.o" ]; then exit 1; fi
 
-# Link the object file into an executable
-eval "/build/zig/zig $(tail /tmp/build-output -n1 | sed 's%-L/usr/lib64/crystal%%') -L\"$LIBRARIES_DIR\" -lunwind" -undefined dynamic_lookup -target "${TARGET_ARCH}-linux-gnu"
+# Link the object file into an executable; the target root comes first in the library search order
+eval "/build/zig/zig cc -L\"$LIBRARIES_DIR\" $(tail -n1 /tmp/build-output | sed -E 's/^cc //; s%-L/usr/lib64/crystal%%') -lunwind" -undefined dynamic_lookup -target "${TARGET_ARCH}-linux-gnu"
 
 function list_required_libs() {
   target="$1"
