@@ -45,6 +45,14 @@ module Crowbar::StreamingAdapter(T)
   abstract def parse_http_request(event : IO) : HTTP::Request
 end
 
+# Crystal >= 1.22 no longer sets Content-Length when a request is given a body.
+private def build_request(method : String, resource : String, headers : HTTP::Headers, body : String?, is_base64_encoded : Bool?) : HTTP::Request
+  decoded_body = body.try { |encoded| is_base64_encoded ? Base64.decode(encoded) : encoded }
+  request = HTTP::Request.new(method: method, resource: resource, headers: headers, body: decoded_body)
+  request.content_length = decoded_body.bytesize.to_i64 if decoded_body
+  request
+end
+
 private def parse_proxy_request(event : IO, encoded_query : Bool) : HTTP::Request
   headers = HTTP::Headers.new
   path = method = is_base64_encoded = body = nil
@@ -91,12 +99,7 @@ private def parse_proxy_request(event : IO, encoded_query : Bool) : HTTP::Reques
     end
   end
 
-  HTTP::Request.new(
-    method: method.not_nil!,
-    resource: "#{path}?#{uri_params}",
-    headers: headers,
-    body: body.try { |body| is_base64_encoded ? Base64.decode(body) : body },
-  )
+  build_request method.not_nil!, "#{path}?#{uri_params}", headers, body, is_base64_encoded
 end
 
 private def serialize_proxy_response(response : Crowbar::HttpServerResponse, multi_value_headers : Bool) : String
@@ -187,12 +190,7 @@ module Crowbar::APIGatewayV2Adapter
       end
     end
 
-    HTTP::Request.new(
-      method: method.not_nil!,
-      resource: "#{raw_path}?#{raw_query_string}",
-      headers: headers,
-      body: body.try { |body| is_base64_encoded ? Base64.decode(body) : body },
-    )
+    build_request method.not_nil!, "#{raw_path}?#{raw_query_string}", headers, body, is_base64_encoded
   end
 
   def self.serialize_http_response(response : HttpServerResponse) : String
