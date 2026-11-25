@@ -112,6 +112,11 @@ private def assert_api_gateway_v2_request(context : HTTP::Server::Context)
                                                   "header2"         => "value1,value2"}
 end
 
+private def inflate_body(response : JSON::Any) : String
+  compressed = IO::Memory.new(Base64.decode(response["body"].as_s))
+  Compress::Zlib::Reader.open(compressed, &.gets_to_end)
+end
+
 private def build_test_response(context : HTTP::Server::Context)
   context.response.status_code = 200
   context.response.content_type = "application/json"
@@ -236,7 +241,9 @@ describe Crowbar do
       end
 
       LambdaTestServer.test_adapter(API_GATEWAY_V1_BASE64_REQUEST, handler, Crowbar::APIGatewayV1Adapter) do |context|
-        JSON.parse(context.request.body.not_nil!.gets_to_end).should eq JSON.parse(<<-JSON)
+        response = JSON.parse(context.request.body.not_nil!.gets_to_end)
+        inflate_body(response).should eq %({"ans":42})
+        response.as_h.reject("body").should eq JSON.parse(<<-JSON).as_h
         {
           "statusCode":200,
           "headers": {
@@ -246,7 +253,6 @@ describe Crowbar do
             "Content-Encoding": "deflate",
             "Set-Cookie": "cookie1=value1,cookie2=value2"
           },
-          "body": "qlZKzCtWsgIAAAD//zIxqgUAAAD//wMA",
           "isBase64Encoded": true
         }
         JSON
@@ -346,7 +352,9 @@ describe Crowbar do
       end
 
       LambdaTestServer.test_adapter(API_GATEWAY_V2_BASE64_REQUEST, handler, Crowbar::APIGatewayV2Adapter) do |context|
-        JSON.parse(context.request.body.not_nil!.gets_to_end).should eq JSON.parse(<<-JSON)
+        response = JSON.parse(context.request.body.not_nil!.gets_to_end)
+        inflate_body(response).should eq %({"ans":42})
+        response.as_h.reject("body").should eq JSON.parse(<<-JSON).as_h
             {
               "statusCode":200,
               "headers": {
@@ -356,7 +364,6 @@ describe Crowbar do
                 "Content-Encoding": "deflate"
               },
               "cookies": ["cookie1=value1", "cookie2=value2"],
-              "body": "qlZKzCtWsgIAAAD//zIxqgUAAAD//wMA",
               "isBase64Encoded": true
             }
             JSON
