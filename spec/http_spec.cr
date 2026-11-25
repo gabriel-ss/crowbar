@@ -146,6 +146,39 @@ describe Crowbar do
   end
 
   describe Crowbar::APIGatewayV1Adapter do
+    it "parses requests with null query string parameters" do
+      request = Crowbar::APIGatewayV1Adapter.parse_http_request IO::Memory.new(<<-JSON)
+      {
+        "path": "/resource/path",
+        "httpMethod": "POST",
+        "queryStringParameters": null,
+        "multiValueQueryStringParameters": null,
+        "body": "Payload",
+        "isBase64Encoded": false
+      }
+      JSON
+
+      request.path.should eq "/resource/path"
+      request.query_params.should be_empty
+      request.body.try(&.gets_to_end).should eq "Payload"
+    end
+
+    it "parses requests with a null body" do
+      request = Crowbar::APIGatewayV1Adapter.parse_http_request IO::Memory.new(<<-JSON)
+      {
+        "path": "/resource/path",
+        "httpMethod": "GET",
+        "queryStringParameters": {"parameter1": "value1"},
+        "multiValueQueryStringParameters": {"parameter1": ["value1"]},
+        "body": null,
+        "isBase64Encoded": false
+      }
+      JSON
+
+      request.resource.should eq "/resource/path?parameter1=value1"
+      request.body.should be_nil
+    end
+
     it "adapts API Gateway v1 requests in single value header mode" do
       Crowbar::APIGatewayV1Adapter.multi_value_headers = false
       test_handler = LambdaTestServer::ErrorHandler.new do |context|

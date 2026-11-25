@@ -67,11 +67,11 @@ module Crowbar::APIGatewayV1Adapter
       when "path"
         path = pull.read_string
       when "queryStringParameters"
-        pull.read_object { |key| uri_params[key] = pull.read_string }
+        pull.read_null_or { pull.read_object { |key| uri_params[key] = pull.read_string } }
       when "multiValueQueryStringParameters"
-        pull.read_object { |key| uri_params[key] = Array(String).new(pull) }
+        pull.read_null_or { pull.read_object { |key| uri_params[key] = Array(String).new(pull) } }
       when "body"
-        body = pull.read_string
+        body = pull.read_string_or_null
       when "isBase64Encoded"
         is_base64_encoded = pull.read_bool
       else pull.skip
