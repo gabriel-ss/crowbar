@@ -254,6 +254,66 @@ describe Crowbar do
     end
   end
 
+  describe Crowbar::ApplicationLoadBalancerAdapter do
+    it "decodes query string parameters forwarded as sent by the client" do
+      request = Crowbar::ApplicationLoadBalancerAdapter.parse_http_request IO::Memory.new(<<-JSON)
+      {
+        "path": "/resource/path",
+        "httpMethod": "GET",
+        "queryStringParameters": {
+          "q": "a%20b%26c",
+          "plus": "a+b",
+          "redirect%5Burl%5D": "https%3A%2F%2Fexample.com"
+        },
+        "headers": {"header1": "value1"},
+        "body": "",
+        "isBase64Encoded": false
+      }
+      JSON
+
+      request.query_params["q"].should eq "a b&c"
+      request.query_params["plus"].should eq "a b"
+      request.query_params["redirect[url]"].should eq "https://example.com"
+    end
+
+    it "decodes multi value query string parameters" do
+      request = Crowbar::ApplicationLoadBalancerAdapter.parse_http_request IO::Memory.new(<<-JSON)
+      {
+        "path": "/resource/path",
+        "httpMethod": "GET",
+        "multiValueQueryStringParameters": {"q": ["a%20b", "c%26d"]},
+        "multiValueHeaders": {"header1": ["value1"]},
+        "body": "",
+        "isBase64Encoded": false
+      }
+      JSON
+
+      request.query_params.fetch_all("q").should eq ["a b", "c&d"]
+    end
+
+    it "serializes responses using its own multi value header setting" do
+      Crowbar::APIGatewayV1Adapter.multi_value_headers = false
+      Crowbar::ApplicationLoadBalancerAdapter.multi_value_headers = true
+      test_handler = LambdaTestServer::ErrorHandler.new do |context|
+        context.response.content_type = "text/plain"
+        context.response.print "ok"
+      end
+
+      LambdaTestServer.test_adapter(API_GATEWAY_V1_REQUEST, test_handler, Crowbar::ApplicationLoadBalancerAdapter) do |context|
+        JSON.parse(context.request.body.not_nil!.gets_to_end).should eq JSON.parse(<<-JSON)
+        {
+          "statusCode": 200,
+          "multiValueHeaders": {"Content-Type": ["text/plain"]},
+          "body": "ok",
+          "isBase64Encoded": false
+        }
+        JSON
+      end
+    ensure
+      Crowbar::ApplicationLoadBalancerAdapter.multi_value_headers = false
+    end
+  end
+
   describe Crowbar::APIGatewayV2Adapter do
     it "adapts API Gateway v2 requests" do
       test_handler = LambdaTestServer::ErrorHandler.new do |context|
